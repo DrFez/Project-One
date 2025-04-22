@@ -35,3 +35,59 @@
 2025-04-22 11:20:23,col,Dashboard clicked location A3
 2025-04-22 11:20:24,col,Dashboard clicked location A2
 2025-04-22 11:20:35,col,Exited application
+2025-04-22 12:33:13,Colin,User 'Colin' logged in GUI
+2025-04-22 12:33:15,Colin,Dashboard clicked location A5
+2025-04-22 12:33:16,Colin,Dashboard clicked location A3
+2025-04-22 12:33:17,Colin,Dashboard clicked location C3
+2025-04-22 12:33:27,Colin,Exited application
+2025-04-22 12:34:29,Neil Ferreira,User 'Neil Ferreira' logged in GUI
+2025-04-22 12:34:47,Neil Ferreira,Dashboard clicked location D4
+2025-04-22 12:37:07,Neil Ferreira,Added product tgdt3e67ug
+2025-04-22 12:38:17,Neil Ferreira,"Stored SKU tgdt3e67ug, qty 50 at D4"
+2025-04-22 12:38:27,Neil Ferreira,Dashboard clicked location D4
+2025-04-22 12:39:41,Neil Ferreira,Dashboard clicked location D4
+2025-04-22 12:44:38,Colin,User 'Colin' logged in GUI
+2025-04-22 12:44:42,Colin,Viewed location C4
+2025-04-22 12:44:53,Colin,Exited application
+2025-04-22 12:46:40,Colin,User 'Colin' logged in GUI
+2025-04-22 12:46:43,Colin,Dashboard clicked location D4
+2025-04-22 12:47:18,Colin,Exited application
+2025-04-22 12:49:40,Colin,User 'Colin' logged in GUI
+2025-04-22 12:50:06,Colin,Dashboard searched SKU tgdt3e67ug
+2025-04-22 12:50:15,Colin,Dashboard clicked location C6
+2025-04-22 12:50:17,Colin,Dashboard clicked location C7
+2025-04-22 12:50:19,Colin,Dashboard clicked location D4
+2025-04-22 12:50:58,Colin,User 'Colin' logged in GUI
+2025-04-22 12:51:07,Colin,Dashboard clicked location D5
+2025-04-22 12:51:08,Colin,Dashboard clicked location C6
+2025-04-22 12:51:09,Colin,Dashboard clicked location C7
+2025-04-22 12:51:16,Colin,Exited application
+2025-04-22 12:54:28,Colin,User 'Colin' logged in GUI
+2025-04-22 12:56:10,colin,User 'colin' logged in GUI
+2025-04-22 12:56:16,colin,Exited application
+2025-04-22 12:56:45,Colin,User 'Colin' logged in GUI
+2025-04-22 12:56:51,Colin,Dashboard searched SKU 9876543210
+2025-04-22 12:57:32,Colin,Added product CRI9892
+2025-04-22 13:01:36,colin,User 'colin' logged in GUI
+2025-04-22 13:01:43,colin,Exited application
+2025-04-22 13:01:51,Colin,User 'Colin' logged in GUI
+2025-04-22 13:02:22,Colin,Manually assigned locations for product CRI1563
+2025-04-22 13:03:04,Colin,Added product BAT4629 with automatic location assignment
+2025-04-22 13:03:11,Colin,Exited application
+2025-04-22 13:10:04,colin,User 'colin' logged in GUI
+2025-04-22 13:10:14,colin,Dashboard clicked location C7
+2025-04-22 13:10:50,colin,User 'colin' logged in GUI
+2025-04-22 13:11:30,colin,Added product APP1335 with automatic location assignment
+2025-04-22 13:11:46,colin,Dashboard searched SKU APP1335
+2025-04-22 13:12:04,colin,Dashboard clicked location C6
+2025-04-22 13:12:11,colin,Exited application
+2025-04-22 13:14:32,Colin,User 'Colin' logged in GUI
+2025-04-22 13:15:01,Colin,Dashboard clicked location C7
+2025-04-22 13:15:27,Colin,Added product BAN7151 with automatic location assignment
+2025-04-22 13:18:32,Colin,User 'Colin' logged in GUI
+2025-04-22 13:20:56,Colin,User 'Colin' logged in GUI
+2025-04-22 13:21:21,Colin,User 'Colin' logged in GUI
+2025-04-22 13:22:26,Colin,Added product CAK8498 with automatic location assignment
+2025-04-22 13:22:31,Colin,Dashboard clicked location C7
+2025-04-22 13:23:03,Colin,Manually assigned 50 units of DIR5775 to locations
+2025-04-22 13:23:13,Colin,Exited application

@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import time
 
 class DashboardView:
@@ -34,6 +34,7 @@ class DashboardView:
         
         ttk.Label(control_frame, text="Warehouse Layout", font=("Arial", 14, "bold")).pack(side=tk.LEFT)
         ttk.Button(control_frame, text="Refresh", command=self.refresh_warehouse_view).pack(side=tk.RIGHT)
+        ttk.Button(control_frame, text="Search Product", command=self.show_search_form).pack(side=tk.RIGHT, padx=5)
         
         # Frame for warehouse grid
         self.warehouse_frame = ttk.Frame(self.left_panel)
@@ -355,22 +356,38 @@ class DashboardView:
     
     def refresh_notifications(self):
         """Refresh the notification section with flagged issues."""
-        # Clear previous notification widgets
-        for widget in self.notification_frame.winfo_children():
-            widget.destroy()
-        
-        mismatched_skus = self.warehouse.validate_quantities()
-        if mismatched_skus:
-            # Show warning for mismatched quantities
-            ttk.Label(self.notification_frame, text="⚠️ Mismatched Quantities Detected:", foreground="red").pack(anchor=tk.W, padx=10, pady=5)
-            for sku in mismatched_skus:
-                product = self.warehouse.products[sku]
-                ttk.Label(self.notification_frame, text=f"- {product.name} (SKU: {sku})", foreground="red").pack(anchor=tk.W, padx=20)
-            
-            # Add Fix button
-            ttk.Button(self.notification_frame, text="Fix Issues", command=self.fix_mismatched_quantities).pack(anchor=tk.W, padx=10, pady=10)
-        else:
-            ttk.Label(self.notification_frame, text="✅ All quantities are accounted for.", foreground="green").pack(anchor=tk.W, padx=10, pady=5)
+        try:
+            # Clear previous notification widgets if frame exists and is valid
+            if hasattr(self, 'notification_frame') and self.notification_frame.winfo_exists():
+                for widget in self.notification_frame.winfo_children():
+                    widget.destroy()
+                
+                mismatched_skus = self.warehouse.validate_quantities()
+                if mismatched_skus:
+                    # Show warning for mismatched quantities
+                    ttk.Label(self.notification_frame, text="⚠️ Mismatched Quantities Detected:", foreground="red").pack(anchor=tk.W, padx=10, pady=5)
+                    for sku in mismatched_skus:
+                        product = self.warehouse.products[sku]
+                        ttk.Label(self.notification_frame, text=f"- {product.name} (SKU: {sku})", foreground="red").pack(anchor=tk.W, padx=20)
+                    
+                    # Add Fix button
+                    ttk.Button(self.notification_frame, text="Fix Issues", command=self.fix_mismatched_quantities).pack(anchor=tk.W, padx=10, pady=10)
+                else:
+                    ttk.Label(self.notification_frame, text="✅ All quantities are accounted for.", foreground="green").pack(anchor=tk.W, padx=10, pady=5)
+        except (tk.TclError, AttributeError, RuntimeError) as e:
+            print(f"DEBUG: Error in refresh_notifications: {e}")
+            # The frame may have been destroyed during tab switching, just ignore the error
+            pass
+
+    def refresh_warehouse_view(self):
+        """Refresh the warehouse grid visualization and notifications."""
+        try:
+            self.draw_warehouse()
+            self.refresh_notifications()
+        except (tk.TclError, AttributeError, RuntimeError) as e:
+            print(f"DEBUG: Error in refresh_warehouse_view: {e}")
+            # Handle any errors during refresh operations
+            pass
 
     def fix_mismatched_quantities(self):
         """Automatically handle mismatched quantities and inform the user."""
@@ -495,7 +512,69 @@ class DashboardView:
             self.text_area.insert(tk.END, new_entry + "\n")
             self.text_area.config(state=tk.DISABLED)
     
-    def refresh_warehouse_view(self):
-        """Refresh the warehouse grid visualization and notifications."""
-        self.draw_warehouse()
-        self.refresh_notifications()
+    def show_search_form(self):
+        """Show search product form in dashboard."""
+        # clear right panel
+        for w in self.right_panel.winfo_children():
+            w.destroy()
+
+        ttk.Label(self.right_panel, text="Search Product", font=("Arial",12,"bold")).pack(pady=10)
+        frm = ttk.Frame(self.right_panel)
+        frm.pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Label(frm, text="Select or enter SKU:").pack(anchor=tk.W)
+        self.search_var = tk.StringVar()
+        combo = ttk.Combobox(frm, textvariable=self.search_var, width=30)
+        combo['values'] = [f"{p.name} ({p.sku})" for p in self.warehouse.products.values()]
+        combo.pack(pady=5, fill=tk.X)
+
+        ttk.Label(frm, text="OR enter SKU directly:").pack(anchor=tk.W, pady=(10,0))
+        self.sku_entry = ttk.Entry(frm)
+        self.sku_entry.pack(pady=5, fill=tk.X)
+
+        btns = ttk.Frame(self.right_panel)
+        btns.pack(fill=tk.X, pady=10)
+        ttk.Button(btns, text="Search", command=self.search_action).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btns, text="Back", command=self.setup_detail_panel).pack(side=tk.RIGHT, padx=5)
+
+        results = ttk.LabelFrame(self.right_panel, text="Results")
+        results.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        self.results_text = tk.Text(results, height=10, wrap=tk.WORD)
+        self.results_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+    def search_action(self):
+        """Handle search from dashboard."""
+        self.results_text.delete(1.0, tk.END)
+        sku = ""
+        if self.search_var.get():
+            sku = self.search_var.get().split("(")[1].split(")")[0]
+        elif self.sku_entry.get().strip():
+            sku = self.sku_entry.get().strip()
+        if not sku:
+            messagebox.showwarning("Input Error", "Please select or enter an SKU.")
+            return
+
+        if sku not in self.warehouse.products:
+            self.results_text.insert(tk.END, f"Product with SKU '{sku}' not found.\n")
+            return
+
+        p = self.warehouse.products[sku]
+        self.results_text.insert(tk.END, f"Product: {p.name} (SKU: {sku})\n")
+        self.results_text.insert(tk.END, f"Price: ${p.price:.2f}\n")
+        self.results_text.insert(tk.END, f"Total quantity in inventory: {p.quantity}\n\n")
+
+        locs = self.warehouse.find_product(sku)
+        if not locs:
+            self.results_text.insert(tk.END, "This product is not stored in any warehouse location.\n")
+        else:
+            self.results_text.insert(tk.END, f"Found at {len(locs)} locations:\n")
+            total = 0
+            for r, c in locs:
+                loc = self.warehouse.grid[r][c]
+                qty = loc.inventory[sku]
+                total += qty
+                self.results_text.insert(tk.END, f"- {loc.get_location_code()}: {qty} units\n")
+            self.results_text.insert(tk.END, f"\nTotal in warehouse locations: {total}\n")
+
+        # log the search
+        self.warehouse.data_storage.save_log(self.warehouse.user, f"Dashboard searched SKU {sku}")

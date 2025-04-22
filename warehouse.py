@@ -34,12 +34,17 @@ class Warehouse:
     
     def add_product(self, product):
         """Register a new product in the warehouse."""
+        print(f"DEBUG: Adding product {product.sku} with quantity {product.quantity}")
         if product.sku not in self.products:
             self.products[product.sku] = product
             self.product_locations[product.sku] = []
-            self.distribute_initial_quantity(product)
+            # Remove automatic distribution - let the caller decide when to distribute
+            # This was causing the doubling issue
+            # self.distribute_initial_quantity(product)
             self._increment_changes()
+            print(f"DEBUG: Product {product.sku} added successfully")
             return True
+        print(f"DEBUG: Product {product.sku} already exists")
         return False
     
     def store_product(self, sku, quantity, row, col):
@@ -55,6 +60,7 @@ class Warehouse:
         Returns:
             bool: True if successful, False otherwise
         """
+        print(f"DEBUG: Storing {quantity} units of {sku} at ({row},{col})")
         if sku not in self.products:
             return False
             
@@ -250,15 +256,40 @@ class Warehouse:
         Args:
             product (Product): The product to distribute.
         """
+        print(f"DEBUG: Distributing {product.quantity} units of {product.sku}")
         quantity_to_distribute = product.quantity
+        initial_qty = quantity_to_distribute
+        
         for row in self.grid:
             for location in row:
                 if quantity_to_distribute <= 0:
+                    print(f"DEBUG: Finished distribution of {product.sku}")
                     return
                 available_space = location.get_available_capacity()
                 if available_space > 0:
                     quantity_to_store = min(quantity_to_distribute, available_space)
                     location.add_product(product, quantity_to_store)
                     quantity_to_distribute -= quantity_to_store
+                    print(f"DEBUG: Stored {quantity_to_store} units at {location.get_location_code()}, {quantity_to_distribute} left")
+        
         if quantity_to_distribute > 0:
-            print(f"Warning: Not enough space to store the full quantity of {product.sku}. Remaining: {quantity_to_distribute}")
+            print(f"WARNING: Not enough space to store the full quantity of {product.sku}. Remaining: {quantity_to_distribute}")
+
+    def delete_product(self, sku):
+        """Remove a product and all its inventory from the warehouse."""
+        if sku not in self.products:
+            return False
+        # Remove inventory entries
+        for r in range(self.rows):
+            for c in range(self.cols):
+                loc = self.grid[r][c]
+                if sku in loc.inventory:
+                    qty = loc.inventory.pop(sku)
+                    loc.current_stock -= qty
+        # Remove from cache and products
+        self.product_locations.pop(sku, None)
+        del self.products[sku]
+        # Save updated data
+        self.data_storage.save_products(self.products)
+        self.data_storage.save_locations(self.grid)
+        return True

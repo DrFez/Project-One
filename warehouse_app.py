@@ -3,9 +3,6 @@ from tkinter import ttk, simpledialog, messagebox
 from warehouse import Warehouse
 from views.dashboard_view import DashboardView
 from views.product_view import ProductView
-from views.storage_view import StorageView
-from dialogs.settings_dialog import SettingsDialog
-from views.log_view import LogView
 
 class WarehouseApp:
     """Main application class for the Warehouse Inventory Management System GUI."""
@@ -118,21 +115,13 @@ class WarehouseApp:
         # Create tabs
         self.dashboard_frame = ttk.Frame(self.notebook)
         self.products_frame = ttk.Frame(self.notebook)
-        self.storage_frame = ttk.Frame(self.notebook)
         
         self.notebook.add(self.dashboard_frame, text="Dashboard")
         self.notebook.add(self.products_frame, text="Products")
-        self.notebook.add(self.storage_frame, text="Storage Operations")
         
         # Setup each tab with its view class
         self.dashboard_view = DashboardView(self.dashboard_frame, self.warehouse)
         self.product_view = ProductView(self.products_frame, self.warehouse, self.dashboard_view.refresh_warehouse_view)
-        self.storage_view = StorageView(
-            self.storage_frame, 
-            self.warehouse, 
-            self.dashboard_view.refresh_warehouse_view,
-            self.product_view.refresh_product_list
-        )
         
         # Set up tab change event to avoid unnecessary refreshes
         self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
@@ -216,17 +205,20 @@ class WarehouseApp:
         
     def on_tab_changed(self, event):
         """Handle tab changing to refresh only when needed."""
-        selected_tab = self.notebook.index(self.notebook.select())
-        previous_tab = self.current_tab
-        self.current_tab = selected_tab
-        
-        # Only refresh the newly selected tab if needed
-        if selected_tab == 0 and previous_tab != 0:  # Dashboard tab
-            self.dashboard_view.refresh_warehouse_view()
-        elif selected_tab == 1 and previous_tab != 1:  # Products tab
-            self.product_view.refresh_product_list()
-        elif selected_tab == 2 and previous_tab != 2:  # Storage tab
-            self.storage_view.draw_mini_map()
+        try:
+            selected_tab = self.notebook.index(self.notebook.select())
+            previous_tab = self.current_tab
+            self.current_tab = selected_tab
+            
+            # Only refresh the newly selected tab if needed
+            if selected_tab == 0 and previous_tab != 0:  # Dashboard tab
+                self.dashboard_view.refresh_warehouse_view()
+            elif selected_tab == 1 and previous_tab != 1:  # Products tab
+                self.product_view.refresh_product_list()
+        except (tk.TclError, Exception) as e:
+            print(f"DEBUG: Error during tab change: {e}")
+            # Tab change might happen during refresh operations, just ignore errors
+            pass
         
     def on_closing(self, restart=False):
         """Handle window closing event - save data before exit."""

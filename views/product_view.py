@@ -1,5 +1,7 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
+import random
+import string
 
 class ProductView:
     """View class for the products management tab."""
@@ -209,6 +211,8 @@ class ProductView:
         
         ttk.Button(action_frame, text="Edit Product", 
                   command=lambda: self.show_edit_product_form(sku)).pack(side=tk.LEFT, padx=5)
+        ttk.Button(action_frame, text="Delete Product", 
+                  command=lambda: self.delete_product_action(sku)).pack(side=tk.LEFT, padx=5)
         ttk.Button(action_frame, text="Back", 
                   command=self.setup_right_panel).pack(side=tk.RIGHT, padx=5)
     
@@ -334,10 +338,14 @@ class ProductView:
         self.name_var = tk.StringVar()
         ttk.Entry(form_frame, textvariable=self.name_var, width=30).pack(pady=5, fill=tk.X)
         
-        # SKU
+        # SKU with Generate button
         ttk.Label(form_frame, text="SKU:").pack(anchor=tk.W, pady=5)
+        sku_frame = ttk.Frame(form_frame)
+        sku_frame.pack(fill=tk.X, pady=5)
+        
         self.sku_var = tk.StringVar()
-        ttk.Entry(form_frame, textvariable=self.sku_var, width=30).pack(pady=5, fill=tk.X)
+        ttk.Entry(sku_frame, textvariable=self.sku_var, width=20).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        ttk.Button(sku_frame, text="Generate SKU", command=self.generate_sku).pack(side=tk.RIGHT, padx=5)
         
         # Price
         ttk.Label(form_frame, text="Price:").pack(anchor=tk.W, pady=5)
@@ -349,6 +357,17 @@ class ProductView:
         self.quantity_var = tk.StringVar(value="0")
         ttk.Spinbox(form_frame, from_=0, to=10000, textvariable=self.quantity_var).pack(pady=5, fill=tk.X)
         
+        # Location assignment option
+        ttk.Label(form_frame, text="Location Assignment:").pack(anchor=tk.W, pady=5)
+        self.location_option = tk.StringVar(value="automatic")
+        options_frame = ttk.Frame(form_frame)
+        options_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Radiobutton(options_frame, text="Automatic Distribution", variable=self.location_option, 
+                       value="automatic").pack(anchor=tk.W)
+        ttk.Radiobutton(options_frame, text="Manual Assignment", variable=self.location_option, 
+                       value="manual").pack(anchor=tk.W)
+        
         # Action buttons
         btn_frame = ttk.Frame(self.right_panel)
         btn_frame.pack(fill=tk.X, pady=10, padx=10)
@@ -356,6 +375,33 @@ class ProductView:
         ttk.Button(btn_frame, text="Add Product", command=self.add_product_action).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Cancel", 
                   command=self.setup_right_panel).pack(side=tk.RIGHT, padx=5)
+    
+    def generate_sku(self):
+        """Generate a unique SKU based on product name."""
+        name = self.name_var.get().strip()
+        if not name:
+            self.show_message("Please enter a product name first", is_error=True)
+            return
+            
+        # Take first 3 letters of product name (or fewer if name is shorter)
+        prefix = ''.join(c for c in name[:3].upper() if c.isalnum())
+        if not prefix:
+            prefix = 'PRD'  # Default prefix if name has no valid characters
+            
+        # Try up to 10 times to generate a unique SKU
+        for _ in range(10):
+            # Generate random 4-digit number
+            suffix = ''.join(random.choices(string.digits, k=4))
+            sku = f"{prefix}{suffix}"
+            
+            # Check if SKU is unique
+            if sku not in self.warehouse.products:
+                self.sku_var.set(sku)
+                self.show_message(f"Generated SKU: {sku}")
+                return
+                
+        # If we couldn't generate a unique SKU after 10 tries
+        self.show_message("Could not generate a unique SKU. Please enter manually.", is_error=True)
     
     def add_product_action(self):
         """Handle the add product action."""
@@ -391,22 +437,199 @@ class ProductView:
             self.show_message("Please enter a valid quantity.", is_error=True)
             return
             
-        # Create product and add to warehouse
-        product = Product(name, sku, price, quantity, warehouse=self.warehouse)
-        self.warehouse.add_product(product)
-        # log add
-        self.warehouse.data_storage.save_log(self.warehouse.user,
-            f"Added product {sku}")
-        self.show_message(f"Product '{name}' added successfully.")
-        self.refresh_product_list()
-        # Show the new product details
-        self.show_product_details_by_sku(sku)
+        # Create product and add to warehouse (without auto-distributing)
+        product = Product(name, sku, price, quantity)
+        
+        print(f"DEBUG: Creating new product {sku} with quantity {quantity}")
+        if not self.warehouse.add_product(product):
+            self.show_message("Failed to add product.", is_error=True)
+            return
+        
+        # Handle location assignment based on user choice
+        if self.location_option.get() == "automatic" and quantity > 0:
+            # Use warehouse's distribution method
+            print(f"DEBUG: Automatic distribution selected for {sku}")
+            self.warehouse.distribute_initial_quantity(product)
+            self.warehouse.data_storage.save_products(self.warehouse.products)
+            self.warehouse.data_storage.save_locations(self.warehouse.grid)
+            
+            # Force rebuild of location cache to ensure accuracy
+            self.warehouse._rebuild_location_cache()
+            
+            self.warehouse.data_storage.save_log(self.warehouse.user,
+                f"Added product {sku} with automatic location assignment")
+            
+            # Refresh views and show success message
+            self.refresh_product_list()
+            self.refresh_warehouse_callback()
+            self.show_message(f"Product '{name}' added and distributed to warehouse locations.")
+            
+            # Show product details instead of going back to main panel
+            self.show_product_details_by_sku(sku)
+        elif self.location_option.get() == "manual" and quantity > 0:
+            # Show manual assignment form
+            print(f"DEBUG: Manual distribution selected for {sku}")
+            self.warehouse.data_storage.save_products(self.warehouse.products)
+            self.show_message(f"Product '{name}' added. Please assign locations.")
+            self.show_manual_location_assignment(sku)
+        else:
+            # Zero quantity or unknown option, just log it
+            print(f"DEBUG: No distribution needed for {sku} (quantity {quantity})")
+            self.warehouse.data_storage.save_products(self.warehouse.products)
+            self.warehouse.data_storage.save_log(self.warehouse.user, f"Added product {sku}")
+            self.show_message(f"Product '{name}' added successfully.")
+            self.refresh_product_list()
+            self.setup_right_panel()  # Return to main view
+    
+    def show_manual_location_assignment(self, sku):
+        """Show form for manually assigning product locations."""
+        # Create a new dialog for location assignment
+        assign_window = tk.Toplevel(self.parent)
+        assign_window.title("Assign Product Locations")
+        assign_window.geometry("450x500")
+        assign_window.transient(self.parent)
+        assign_window.grab_set()
+        
+        product = self.warehouse.products[sku]
+        
+        # Dialog header
+        ttk.Label(assign_window, text=f"Assign Locations for {product.name}", 
+                 font=("Arial", 12, "bold")).pack(pady=10)
+        ttk.Label(assign_window, text=f"Total Quantity: {product.quantity}").pack(pady=5)
+        
+        # Create scrollable frame for location assignments
+        main_frame = ttk.Frame(assign_window)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Canvas for scrolling
+        canvas = tk.Canvas(main_frame)
+        scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Remaining quantity display
+        remaining_var = tk.IntVar(value=product.quantity)
+        
+        def update_remaining(event=None):
+            """Update the remaining quantity based on current assignments."""
+            assigned = sum(int(qty_vars[i].get()) if qty_vars[i].get().isdigit() else 0 
+                           for i in range(len(qty_vars)))
+            remaining = max(0, product.quantity - assigned)
+            remaining_var.set(remaining)
+            remaining_label.config(text=f"Remaining Quantity: {remaining}")
+        
+        # Create location entries
+        location_labels = []
+        qty_vars = []
+        qty_entries = []
+        
+        row = 0
+        for r in range(self.warehouse.rows):
+            for c in range(self.warehouse.cols):
+                location = self.warehouse.grid[r][c]
+                available = location.get_available_capacity()
+                
+                if available > 0:
+                    # Container frame for this location
+                    loc_frame = ttk.Frame(scrollable_frame)
+                    loc_frame.grid(row=row, column=0, sticky="ew", padx=5, pady=2)
+                    
+                    # Location info
+                    loc_label = ttk.Label(loc_frame, text=f"{location.get_location_code()} (Available: {available})")
+                    loc_label.pack(side=tk.LEFT, padx=5)
+                    location_labels.append(loc_label)
+                    
+                    # Quantity entry
+                    qty_var = tk.StringVar(value="0")
+                    qty_vars.append(qty_var)
+                    
+                    qty_entry = ttk.Spinbox(loc_frame, from_=0, to=min(available, product.quantity), 
+                                          textvariable=qty_var, width=10)
+                    qty_entry.pack(side=tk.RIGHT, padx=5)
+                    qty_entries.append(qty_entry)
+                    
+                    # Bind changes to update remaining
+                    qty_var.trace_add("write", update_remaining)
+                    
+                    row += 1
+        
+        # Display remaining quantity
+        remaining_label = ttk.Label(assign_window, text=f"Remaining Quantity: {product.quantity}")
+        remaining_label.pack(pady=5)
+        
+        # Action buttons
+        btn_frame = ttk.Frame(assign_window)
+        btn_frame.pack(fill=tk.X, pady=10, padx=10)
+        
+        def assign_locations():
+            """Handle the assignment action."""
+            assigned = 0
+            print(f"DEBUG: Manually assigning locations for {sku}")
+            
+            # Store product at each selected location
+            for i in range(len(qty_vars)):
+                try:
+                    qty = int(qty_vars[i].get())
+                    if qty > 0:
+                        # Get location coordinates from label text
+                        loc_code = location_labels[i].cget("text").split()[0]
+                        row = ord(loc_code[0]) - 65
+                        col = int(loc_code[1:]) - 1
+                        
+                        # Store at location
+                        print(f"DEBUG: Storing {qty} of {sku} at {loc_code}")
+                        if self.warehouse.store_product(sku, qty, row, col):
+                            assigned += qty
+                            print(f"DEBUG: Successfully stored {qty} units at {loc_code}")
+                        else:
+                            print(f"DEBUG: Failed to store at {loc_code}")
+                except (ValueError, IndexError) as e:
+                    print(f"DEBUG: Error processing location {i}: {e}")
+            
+            # Check if all quantity was assigned
+            product = self.warehouse.products[sku]
+            total_assigned = assigned
+            if assigned < product.quantity:
+                # Update product quantity to match what was assigned
+                delta = assigned - product.quantity
+                print(f"DEBUG: Updating product quantity from {product.quantity} to {assigned} (delta: {delta})")
+                product.update_quantity(delta)
+                messagebox.showinfo("Partial Assignment", 
+                    f"Only {assigned} of {product.quantity} units were assigned to locations. Product quantity has been updated.")
+            
+            # Save changes
+            self.warehouse.data_storage.save_products(self.warehouse.products)
+            self.warehouse.data_storage.save_locations(self.warehouse.grid)
+            
+            # Log the action
+            self.warehouse.data_storage.save_log(self.warehouse.user,
+                f"Manually assigned {total_assigned} units of {sku} to locations")
+            
+            # Close dialog and refresh
+            print(f"DEBUG: Assignment complete, refreshing views")
+            assign_window.destroy()
+            self.refresh_product_list()
+            self.refresh_warehouse_callback()
+            self.show_product_details_by_sku(sku)
+        
+        ttk.Button(btn_frame, text="Assign Locations", command=assign_locations).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=assign_window.destroy).pack(side=tk.RIGHT, padx=5)
     
     def show_product_details_by_sku(self, sku):
         """Show product details by SKU."""
         if sku not in self.warehouse.products:
             return
-            
+        
         # Select the product in the treeview
         for item in self.product_tree.get_children():
             if self.product_tree.item(item, "values")[1] == sku:
@@ -414,7 +637,7 @@ class ProductView:
                 self.product_tree.focus(item)
                 break
                 
-        # Show the details
+        # Show the details        
         for widget in self.right_panel.winfo_children():
             widget.destroy()
             
@@ -460,6 +683,8 @@ class ProductView:
         
         ttk.Button(action_frame, text="Edit Product", 
                   command=lambda: self.show_edit_product_form(sku)).pack(side=tk.LEFT, padx=5)
+        ttk.Button(action_frame, text="Delete Product", 
+                  command=lambda: self.delete_product_action(sku)).pack(side=tk.LEFT, padx=5)
         ttk.Button(action_frame, text="Back", 
                   command=self.setup_right_panel).pack(side=tk.RIGHT, padx=5)
     
@@ -497,7 +722,7 @@ class ProductView:
         self.edit_price_var = tk.StringVar(value=str(product.price))
         ttk.Entry(form_frame, textvariable=self.edit_price_var, width=30).pack(pady=5, fill=tk.X)
         
-        # Quantity
+        # Quantity    
         ttk.Label(form_frame, text="Quantity:").pack(anchor=tk.W, pady=5)
         self.edit_quantity_var = tk.StringVar(value=str(product.quantity))
         ttk.Spinbox(form_frame, from_=0, to=10000, textvariable=self.edit_quantity_var).pack(pady=5, fill=tk.X)
@@ -558,3 +783,15 @@ class ProductView:
         self.show_message("Product updated successfully.")
         self.refresh_product_list()
         self.show_product_details_by_sku(sku)
+    
+    def delete_product_action(self, sku):
+        """Handle product deletion with confirmation."""
+        if messagebox.askyesno("Confirm Delete", 
+                f"Are you sure you want to delete product {sku}? This cannot be undone."):
+            if self.warehouse.delete_product(sku):
+                self.show_message(f"Product {sku} deleted successfully.")
+                self.refresh_product_list()
+                self.refresh_warehouse_callback()
+                self.setup_right_panel()
+            else:
+                messagebox.showerror("Error", "Failed to delete product.")

@@ -15,8 +15,6 @@ class Product:
         self.sku = sku
         self.price = price
         self.quantity = quantity
-        if warehouse and quantity > 0:
-            warehouse.distribute_initial_quantity(self)
         
     def update_quantity(self, amount):
         """
